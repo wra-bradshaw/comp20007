@@ -39,14 +39,15 @@
                   value = pkgs.stdenv.mkDerivation {
                     name = "${s}-debug";
                     src = ./projects/${s};
-                    nativeBuildInputs = [ pkgs.clang ];
-                    buildPhase = ''
-                      clang -Wall -Wextra -Werror -Wno-unused-parameter -pedantic -std=c17 -ggdb -o ${s} main.c
-                    '';
-                    installPhase = ''
-                      mkdir -p $out/bin
-                      mv ${s} $out/bin/
-                    '';
+                    cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Debug" ];
+                    dontStrip = true;
+                    buildInputs = [
+                      pkgs.criterion
+                    ];
+                    nativeBuildInputs = [
+                      pkgs.cmake
+                      pkgs.pkg-config
+                    ];
                     meta = {
                       mainProgram = s;
                     };
@@ -64,14 +65,17 @@
                   value = pkgs.stdenv.mkDerivation {
                     name = s;
                     src = ./projects/${s};
-                    nativeBuildInputs = [ pkgs.gcc ];
-                    buildPhase = ''
-                      gcc -Wall -Wextra -Werror -Wno-unused-parameter -pedantic -std=c17 -o ${s} main.c
-                    '';
-                    installPhase = ''
-                      mkdir -p $out/bin
-                      mv ${s} $out/bin/
-                    '';
+                    cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" ];
+                    buildInputs = [
+                      pkgs.criterion
+                    ];
+                    nativeBuildInputs = [
+                      pkgs.cmake
+                      pkgs.pkg-config
+                    ];
+                    meta = {
+                      mainProgram = s;
+                    };
                   };
                 }) projectsManifest
               ));
@@ -95,6 +99,7 @@
             runtimeInputs = [
               self.packages.${system}.generate-manifest
               pkgs.git
+              pkgs.gnused
             ];
             text = ''
               if [ -z "$1" ]; then
@@ -108,10 +113,12 @@
 
               mkdir "$DIRECTORY"
               cp --no-preserve=mode ${./boilerplate.c} "$DIRECTORY/main.c"
+              cp --no-preserve=mode ${./boilerplate_test.c} "$DIRECTORY/test.c"
+              sed "s/@PROJECT_NAME@/$1/g" ${./boilerplate_CMakeLists.txt} > "$DIRECTORY/CMakeLists.txt"
               generate-manifest
 
-              git add "$DIRECTORY/main.c"
-              git add "$ROOT_DIRECTORY/manifest.json"
+              git add "$DIRECTORY/main.c" "$DIRECTORY/test.c" "$DIRECTORY/CMakeLists.txt"
+              git add "$(git rev-parse --show-toplevel)/manifest.json"
             '';
           };
 
@@ -121,12 +128,19 @@
             text = ''
               PROJECT_NAME="$1"
               if [ -z "$PROJECT_NAME" ]; then
-              	echo "Usage: $0 <project-name>" >&2
+              	echo "Usage: $0 <project-name> [--test]" >&2
               	exit 1
               fi
-              BINARY_PATH="$(nix build --print-out-paths --no-link ".#projects.debug.$PROJECT_NAME")/bin/$PROJECT_NAME"
-              echo "$BINARY_PATH"
-              lldb "$BINARY_PATH"
+
+              if [ "''${2:-}" = "--test" ]; then
+                BINARY_PATH="$(nix build --print-out-paths --no-link ".#projects.debug.$PROJECT_NAME")/bin/test"
+                echo "$BINARY_PATH"
+                lldb "$BINARY_PATH"
+              else
+                BINARY_PATH="$(nix build --print-out-paths --no-link ".#projects.debug.$PROJECT_NAME")/bin/$PROJECT_NAME"
+                echo "$BINARY_PATH"
+                lldb "$BINARY_PATH"
+              fi
             '';
           };
         }
@@ -147,6 +161,9 @@
               self.packages.${system}.generate-manifest
               self.packages.${system}.new-project
               self.packages.${system}.debug
+              cmake
+              pkg-config
+              criterion
             ];
           };
         }
