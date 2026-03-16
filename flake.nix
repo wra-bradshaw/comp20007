@@ -36,7 +36,7 @@
               (builtins.listToAttrs (
                 map (s: {
                   name = s;
-                  value = pkgs.stdenv.mkDerivation {
+                  value = pkgs.clangStdenv.mkDerivation {
                     name = "${s}-debug";
                     src = ./projects/${s};
                     cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Debug" ];
@@ -62,7 +62,7 @@
               (builtins.listToAttrs (
                 map (s: {
                   name = s;
-                  value = pkgs.stdenv.mkDerivation {
+                  value = pkgs.clangStdenv.mkDerivation {
                     name = s;
                     src = ./projects/${s};
                     cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" ];

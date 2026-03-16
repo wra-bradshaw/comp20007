@@ -3,7 +3,8 @@
 int main(void) {
   int i, num, j;
   printf("Enter the number: ");
-  scanf("%d", &num);
+  if (scanf("%d", &num) != 1)
+    return 1;
 
   for (i = 1; i < num; i++)
     j = j * i;
