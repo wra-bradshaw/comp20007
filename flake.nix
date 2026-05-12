@@ -39,13 +39,20 @@
                   value = pkgs.clangStdenv.mkDerivation {
                     name = "${s}-debug";
                     src = ./projects/${s};
-                    cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Debug" ];
+                    mesonBuildType = "debugoptimized";
+                    mesonFlags = [
+                      "-Db_sanitize=address,undefined"
+                      "-Db_lundef=false"
+                      "-Dwerror=true"
+                    ];
                     dontStrip = true;
+                    doCheck = false;
                     buildInputs = [
                       pkgs.criterion
                     ];
                     nativeBuildInputs = [
-                      pkgs.cmake
+                      pkgs.meson
+                      pkgs.ninja
                       pkgs.pkg-config
                     ];
                     meta = {
@@ -65,12 +72,14 @@
                   value = pkgs.clangStdenv.mkDerivation {
                     name = s;
                     src = ./projects/${s};
-                    cmakeFlags = [ "-DCMAKE_BUILD_TYPE=Release" ];
+                    mesonBuildType = "release";
+                    doCheck = false;
                     buildInputs = [
                       pkgs.criterion
                     ];
                     nativeBuildInputs = [
-                      pkgs.cmake
+                      pkgs.meson
+                      pkgs.ninja
                       pkgs.pkg-config
                     ];
                     meta = {
@@ -114,10 +123,10 @@
               mkdir "$DIRECTORY"
               cp --no-preserve=mode ${./boilerplate.c} "$DIRECTORY/main.c"
               cp --no-preserve=mode ${./boilerplate_test.c} "$DIRECTORY/test.c"
-              sed "s/@PROJECT_NAME@/$1/g" ${./boilerplate_CMakeLists.txt} > "$DIRECTORY/CMakeLists.txt"
+              sed "s/@PROJECT_NAME@/$1/g" ${./boilerplate_meson.build} > "$DIRECTORY/meson.build"
               generate-manifest
 
-              git add "$DIRECTORY/main.c" "$DIRECTORY/test.c" "$DIRECTORY/CMakeLists.txt"
+              git add "$DIRECTORY/main.c" "$DIRECTORY/test.c" "$DIRECTORY/meson.build"
               git add "$(git rev-parse --show-toplevel)/manifest.json"
             '';
           };
@@ -133,7 +142,7 @@
               fi
 
               if [ "''${2:-}" = "--test" ]; then
-                BINARY_PATH="$(nix build --print-out-paths --no-link ".#projects.debug.$PROJECT_NAME")/bin/test"
+                BINARY_PATH="$(nix build --print-out-paths --no-link ".#projects.debug.$PROJECT_NAME")/bin/unit-tests"
                 echo "$BINARY_PATH"
                 lldb "$BINARY_PATH"
               else
@@ -161,7 +170,9 @@
               self.packages.${system}.generate-manifest
               self.packages.${system}.new-project
               self.packages.${system}.debug
-              cmake
+              just
+              meson
+              ninja
               pkg-config
               criterion
             ];
